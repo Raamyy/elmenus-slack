@@ -62,7 +62,7 @@ app.post('/elmenus/order', async (req, res) => {
     }
     res.json({
         "response_type": "in_channel", // show the message on slack
-        "text": `Ordering in FIVE!\n\n${groupLink}`
+        "text": `Ordering ${restaurantName} in FIVE!\n\nhttps://www.elmenus.com${groupLink}`
     });
 });
 
