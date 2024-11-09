@@ -44,6 +44,10 @@ app.post('/elmenus/order', async (req, res) => {
     let requestBody = req.body.text.toLowerCase();
     // TODO: in future add more commands here
     let restaurantName = requestBody;
+    if(restaurantName == null){
+        res.send('provide restaurant name, for example: /order qedra');
+        return;
+    }
     let restaurantId = restaurants[restaurantName]?.uuid;
     let branchId = restaurants[restaurantName]?.branchId;
     if(restaurantId == null){
