@@ -32,7 +32,7 @@ let users = JSON.parse(process.env.USERS);
 app.post('/elmenus/order', async (req, res) => {
     let user = users[req.body.user_id];
     if(!user){
-        res.send("Authentication Failed! contact @Raamyy to be able to create orders :sunglasses:");
+        res.send("Authentication Failed! contact @Raamyy to be able to create orders 😎");
         return;
     }
     let deviceId = generateRandomAlphaNumeric(15);
@@ -47,7 +47,7 @@ app.post('/elmenus/order', async (req, res) => {
     let restaurantId = restaurants[restaurantName]?.uuid;
     let branchId = restaurants[restaurantName]?.branchId;
     if(restaurantId == null){
-        res.send(`${restaurantName} is not available right now to be ordered from slack :frown:`);
+        res.send(`${restaurantName} is not available right now to be ordered from slack ☹️`);
         return;
     }
     let isAlreadymember = await isAlreadyGroupMember(restaurantId, token, deviceId);
@@ -57,7 +57,7 @@ app.post('/elmenus/order', async (req, res) => {
     }
     let groupLink = await startGroupOrder(restaurantId, branchId, ZAMALEK_ZONE_ID, token, deviceId);
     if (groupLink == null) {
-        res.send("Creating group order failed :frown: try again in a few minuites, aw roo7 e3mlo manual ba2a :joy:");
+        res.send("Creating group order failed ☹️ try again in a few minuites, aw roo7 e3mlo manual ba2a 😂");
         return;
     }
     res.json({
