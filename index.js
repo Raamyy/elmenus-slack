@@ -1,8 +1,9 @@
 require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
-const { getElmenusAccessToken, isAlreadyGroupMember, startGroupOrder, getRestaurantId } = require("./elmenus")
+const { getElmenusAccessToken, isAlreadyGroupMember, startGroupOrder, getRestaurantId, addItemToGroupOrder } = require("./elmenus")
 const { v4: uuidv4 } = require('uuid');
+const axios = require('axios');
 
 const app = express()
 
@@ -11,16 +12,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 
-
-let restaurants = {
-    "qedra": {
-        uuid: "36615d5b-2224-11e8-924e-0242ac110011",
-        branchId: "53016855-96f2-4a17-ab59-03daf2e3a543"
-    }
-}
-
 const CAIRO_CITY_ID = "35185821-2224-11e8-924e-0242ac110011";
 const ZAMALEK_ZONE_ID = "7949dafc-35e8-41b8-b9f5-43b1a10c6481";
+
 
 // users is an object in env following this structure:
 /*
@@ -30,54 +24,88 @@ const ZAMALEK_ZONE_ID = "7949dafc-35e8-41b8-b9f5-43b1a10c6481";
 }
 */
 let users = JSON.parse(process.env.USERS);
+let favOrders = JSON.parse(process.env.FAV_ORDERS);
+
 
 app.post('/elmenus/order', async (req, res) => {
+    res.sendStatus(200); // early respond to confirm message receive    
     try {
-        let user = users[req.body.user_id];
+
+        let userId = req.body.user_id
+        let responseUrl = decodeURIComponent(req.body.response_url);
+        let user = users[userId];
         if (!user) {
-            res.send("Authentication Failed! contact @Raamyy to be able to create orders 😎");
+            await respondToSlack(responseUrl, "Authentication Failed! contact @Raamyy to be able to create orders 😎");
             return;
         }
         let deviceId = generateRandomAlphaNumeric(15);
         let token = await getElmenusAccessToken(user.email, user.password, deviceId);
         if (token == null) {
-            res.send("Login Failed! contact @Raamyy and make sure of the provided email/password");
+            await respondToSlack(responseUrl, "Login Failed! contact @Raamyy and make sure of the provided email/password");
             return;
         }
         let requestBody = req.body.text.toLowerCase();
         // TODO: in future add more commands here
         let restaurantName = requestBody;
         if (restaurantName == null) {
-            res.send('provide restaurant name, for example: /order qedra');
+            await respondToSlack(responseUrl, 'provide restaurant name, for example: /order qedra');
             return;
         }
         let restaurantId = await getRestaurantId(restaurantName, CAIRO_CITY_ID, token, deviceId);
         let branchId = uuidv4(); // somehow generating random branchid just works and elmenus automatically selects suitable branch
         if (restaurantId == null) {
-            res.send(`${restaurantName} is not available right now to be ordered from slack ☹️`);
+            await respondToSlack(responseUrl, `${restaurantName} is not available right now to be ordered from slack ☹️`);
             return;
         }
         let isAlreadymember = await isAlreadyGroupMember(restaurantId, token, deviceId);
         if (isAlreadymember) {
-            res.send("you are already member of the group order :)");
+            await respondToSlack(responseUrl, "you are already member of the group order :)");
             return;
         }
-        let groupLink = await startGroupOrder(restaurantId, branchId, ZAMALEK_ZONE_ID, token, deviceId);
-        if (groupLink == null) {
-            res.send("Creating group order failed ☹️ probably you have an existing cart check it!");
+        let response = await startGroupOrder(restaurantId, branchId, ZAMALEK_ZONE_ID, token, deviceId);
+        if (response == null) {
+            await respondToSlack(responseUrl, "Creating group order failed ☹️ probably you have an existing cart check it!");
             return;
         }
-        res.json({
-            "response_type": "in_channel", // show the message on slack
-            "text": `Ordering ${restaurantName} in FIVE!\n\nhttps://www.elmenus.com${groupLink}`
-        });
+        let { groupLink, groupId } = response;
+
+
+        if (favOrders[userId]?.[restaurantId]?.length) {
+            let favItems = favOrders[userId][restaurantId];
+            for (const item of favItems) {
+                let res = await addItemToGroupOrder(groupId, item, token, deviceId);
+                if (res == null) {
+                    await respondToSlack(responseUrl, `adding ${item.name} failed`);
+                }
+            }
+        }
+        await respondToSlack(responseUrl,
+            {
+                "response_type": "in_channel", // show the message on slack
+                "text": `Ordering ${restaurantName} in FIVE!\n\nhttps://www.elmenus.com${groupLink}`
+            });
     } catch (e) {
         console.log("error captured", req.body, e);
-        
-        res.send("Creating group order failed ☹️ try again in a few minuites, aw roo7 e3mlo manual ba2a 😂");
+
+        await respondToSlack(responseUrl, "Creating group order failed ☹️ try again in a few minuites, aw roo7 e3mlo manual ba2a 😂");
     }
 });
 
+async function respondToSlack(resposeURL, response) {
+    try {
+        console.log("sending to slack", response);
+
+        let data = JSON.stringify(response);
+        let config = {
+            method: 'post',
+            url: resposeURL,
+            data: data
+        };
+        let slackResponse = await axios.request(config);
+    } catch (e) {
+        console.error("sending to slack failed", e?.response?.data);
+    }
+}
 
 
 function generateRandomAlphaNumeric(length) {
