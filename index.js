@@ -45,6 +45,8 @@ app.post('/elmenus/order', async (req, res) => {
 
 app.post('/elmenus/order/process', async (req, res) => {
     try {
+        console.log("recieved request", req.body);
+        
         let userId = req.body.user_id
         let responseUrl = decodeURIComponent(req.body.response_url);
         let user = users[userId];
@@ -60,6 +62,8 @@ app.post('/elmenus/order/process', async (req, res) => {
             res.sendStatus(200);
             return;
         }
+        console.log("generated access token");
+
         let requestBody = req.body.text.toLowerCase();
         // TODO: in future add more commands here
         let restaurantName = requestBody;
@@ -75,6 +79,7 @@ app.post('/elmenus/order/process', async (req, res) => {
             res.sendStatus(200);
             return;
         }
+        console.log("got restaurant id", restaurantId);
         let isAlreadymember = await isAlreadyGroupMember(restaurantId, token, deviceId);
         if (isAlreadymember) {
             await respondToSlack(responseUrl, "you are already member of the group order :)");
@@ -88,6 +93,7 @@ app.post('/elmenus/order/process', async (req, res) => {
             return;
         }
         let { groupLink, groupId } = response;
+        console.log("started group order", groupLink);
 
 
         if (favOrders[userId]?.[restaurantId]?.length) {
@@ -99,6 +105,8 @@ app.post('/elmenus/order/process', async (req, res) => {
                 }
             }
         }
+        console.log("added items");
+
         await respondToSlack(responseUrl,
             {
                 "response_type": "in_channel", // show the message on slack
