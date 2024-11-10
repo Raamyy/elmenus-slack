@@ -40,7 +40,11 @@ app.post('/elmenus/order', async (req, res) => {
     } catch (e) {
         console.error("redirecting to endpoint failed", e?.response?.data);
     }
-    res.send("لحظات يافندم جاري مراجعة المطعم 📝"); // early respond to confirm message receive    
+    res.send({
+        "response_type": "in_channel", // show the message on slack
+        "text": "لحظات يافندم جاري مراجعة المطعم 📝"
+    }); // early respond to confirm message receive    
+    
 })
 
 app.post('/elmenus/order/process', async (req, res) => {
@@ -124,14 +128,19 @@ app.post('/elmenus/order/process', async (req, res) => {
 
 async function respondToSlack(resposeURL, response) {
     try {
-        console.log("sending to slack", response);
-
+        if(typeof response == 'string')
+        {
+            response = {
+                "text": response
+            }
+        }
         let data = JSON.stringify(response);
         let config = {
             method: 'post',
             url: resposeURL,
             data: data
         };
+        console.log("sending to slack", config);
         let slackResponse = await axios.request(config);
     } catch (e) {
         console.error("sending to slack failed", e?.response?.data);
